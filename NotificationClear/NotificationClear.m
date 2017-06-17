@@ -3,21 +3,24 @@
 //  NotificationClear
 //
 //  Re-written for learning and El Capitan by Wolfgang Baird on 8/3/15.
-//  Now supports 10.9 to 10.12
+//  Now supports 10.9 to 10.17
 //
 //  Copyright (c) 2015 Carl Henderson. All rights reserved.
-//  Copyright (c) 2015 - 2016 Wolfgang Baird. All rights reserved.
+//  Copyright (c) 2015 - 2017 Wolfgang Baird. All rights reserved.
 //
 
 @import AppKit;
 #import "ZKSwizzle.h"
 
 NSButton *clearAllBtn = nil;
+NSUInteger osx_ver;
 Class ncTableController;
 SEL getApp;
+SEL getApp13;
 SEL clearApp;
 
 @interface NCNotificationCenter : NSObject
+- (id)application:(id)arg1;
 - (id)applicationFor:(id)arg1;
 - (id)applicationForIdentifier:(id)arg1;
 - (void)clearNotificationsForApplication:(id)arg1;
@@ -54,7 +57,9 @@ void _WB_NCNShow(NSViewController * nsv)
         {
             buttonHeight = 32;
             buttonLeft = (ncWidth / 2) - (buttonWidth / 2);
-        } else {
+        }
+        else
+        {
             buttonHeight = 30;
             buttonLeft = (ncWidth / 2) + (buttonWidth / 4);
         }
@@ -83,13 +88,17 @@ void _WB_NCTShow()
 +(void)load
 {
     clearAllBtn = [[NSButton alloc] init];
-    NSUInteger osx_ver = [[NSProcessInfo processInfo] operatingSystemVersion].minorVersion;
-    if (osx_ver >= 12) {
+    osx_ver = [[NSProcessInfo processInfo] operatingSystemVersion].minorVersion;
+    if (osx_ver >= 12)
+    {
         ncTableController = NSClassFromString(@"NotificationCenterApp.NotificationsTableController");
         getApp = @selector(applicationFor:);
+        getApp13 = @selector(application:);
         clearApp = @selector(clearNotificationsFor:);
         ZKSwizzle(_WB_NCNotificationCenterWindowController, NCNotificationCenterWindowController);
-    } else {
+    }
+    else
+    {
         ZKSwizzle(_WB_NCNotificationTableController, NCNotificationTableController);
         ZKSwizzle(_WB_NCTodayViewController, NCTodayViewController);
     }
@@ -146,17 +155,35 @@ void _WB_NCTShow()
 
 @implementation _WB_NCNotificationCenterWindowController
 
-// 10.12 support
+// 10.12+ support
 
 - (IBAction)clearNotifications:(id)sender
 {
-    NSViewController *viewController = ZKHookIvar(self, NSViewController*, "_visibleViewController");
-    NSObject *data = ZKHookIvar(viewController, NSObject*, "dataSource");
-    NSMutableDictionary *appDict = ZKHookIvar(data, NSMutableDictionary*, "_applicationForBundleIdentifier");
-    for (NSObject *item in appDict)
+    
+    if (osx_ver > 12)
     {
-        NSObject *appInfo = [data performSelector:getApp withObject:item];
-        [data performSelector:clearApp withObject:appInfo];
+        // 10.13 support
+        Class nc = NSClassFromString(@"NotificationCenterApp.NotificationsController");
+        SEL getShare = NSSelectorFromString(@"shared");
+        id sharedNC = [nc performSelector:getShare];
+        NSArray *appOrder = [sharedNC valueForKey:@"applicationOrder"];
+        for (NSObject *item in appOrder)
+        {
+            NSObject *appInfo = [sharedNC performSelector:getApp13 withObject:item];
+            [sharedNC performSelector:clearApp withObject:appInfo];
+        }
+    }
+    else
+    {
+        // 10.12 support
+        NSViewController *viewController = ZKHookIvar(self, NSViewController*, "_visibleViewController");
+        NSObject *data = ZKHookIvar(viewController, NSObject*, "dataSource");
+        NSMutableDictionary *appDict = ZKHookIvar(data, NSMutableDictionary*, "_applicationForBundleIdentifier");
+        for (NSObject *item in appDict)
+        {
+            NSObject *appInfo = [data performSelector:getApp withObject:item];
+            [data performSelector:clearApp withObject:appInfo];
+        }
     }
 }
 
@@ -173,12 +200,14 @@ void _WB_NCTShow()
     }
 }
 
-- (void)tabChanged:(id)arg1 {
+- (void)tabChanged:(id)arg1
+{
     ZKOrig(void, arg1);
     [self wb_toggleHidden];
 }
 
-- (void)willBeShown {
+- (void)willBeShown
+{
     static dispatch_once_t once;
     dispatch_once(&once, ^ {
         NSLog(@"Setting up button");
