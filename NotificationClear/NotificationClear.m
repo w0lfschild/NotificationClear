@@ -3,7 +3,7 @@
 //  NotificationClear
 //
 //  Re-written for learning and El Capitan by Wolfgang Baird on 8/3/15.
-//  Now supports 10.9 to 10.17
+//  Now supports 10.9 to 10.13
 //
 //  Copyright (c) 2015 Carl Henderson. All rights reserved.
 //  Copyright (c) 2015 - 2017 Wolfgang Baird. All rights reserved.
@@ -14,6 +14,7 @@
 
 NSButton *clearAllBtn = nil;
 NSUInteger osx_ver;
+NSString* systemBuild = @"";
 Class ncTableController;
 SEL getApp;
 SEL getApp13;
@@ -89,6 +90,8 @@ void _WB_NCTShow()
 {
     clearAllBtn = [[NSButton alloc] init];
     osx_ver = [[NSProcessInfo processInfo] operatingSystemVersion].minorVersion;
+    systemBuild = [[NSDictionary dictionaryWithContentsOfFile:@"/System/Library/CoreServices/SystemVersion.plist"] objectForKey:@"ProductBuildVersion"];
+    
     if (osx_ver >= 12)
     {
         ncTableController = NSClassFromString(@"NotificationCenterApp.NotificationsTableController");
@@ -102,7 +105,7 @@ void _WB_NCTShow()
         ZKSwizzle(_WB_NCNotificationTableController, NCNotificationTableController);
         ZKSwizzle(_WB_NCTodayViewController, NCTodayViewController);
     }
-    NSLog(@"Notification Clear Loaded");
+    NSLog(@"%@ loaded into %@ on macOS 10.%ld", [self class], [[NSBundle mainBundle] bundleIdentifier], osx_ver);
 }
 
 @end
@@ -163,14 +166,28 @@ void _WB_NCTShow()
     if (osx_ver > 12)
     {
         // 10.13 support
-        Class nc = NSClassFromString(@"NotificationCenterApp.NotificationsController");
-        SEL getShare = NSSelectorFromString(@"shared");
-        id sharedNC = [nc performSelector:getShare];
-        NSArray *appOrder = [sharedNC valueForKey:@"applicationOrder"];
-        for (NSObject *item in appOrder)
+        if ([systemBuild isEqualToString:@"17A264c"])
         {
-            NSObject *appInfo = [sharedNC performSelector:getApp13 withObject:item];
-            [sharedNC performSelector:clearApp withObject:appInfo];
+            Class nc = NSClassFromString(@"NotificationCenterApp.NotificationsController");
+            SEL getShare = NSSelectorFromString(@"shared");
+            id sharedNC = [nc performSelector:getShare];
+            NSArray *appOrder = [sharedNC valueForKey:@"applicationOrder"];
+            for (NSObject *item in appOrder)
+            {
+                NSLog(@"%@", item);
+                NSObject *appInfo = [sharedNC performSelector:getApp13 withObject:item];
+                [sharedNC performSelector:clearApp withObject:appInfo];
+            }
+        } else {
+            NSViewController *viewController = ZKHookIvar(self, NSViewController*, "_tableController");
+            NSTableView *table = ZKHookIvar(viewController, NSTableView*, "tableView");
+            for (long x = [table numberOfRows] - 1; x >= 0; x--) {
+                NSTableCellView *cellView = [table viewAtColumn:0 row:x makeIfNecessary:YES];
+                NSObject *controller = ZKHookIvar(cellView, NSObject*, "rowController");
+                SEL deleteNotification = sel_registerName("deleteClicked:");
+                if ([controller respondsToSelector:deleteNotification])
+                    [controller performSelector:deleteNotification withObject:nil];
+            }
         }
     }
     else
