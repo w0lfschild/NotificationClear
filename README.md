@@ -5,8 +5,9 @@
 # Information:
 
 - Designed for 10.9+ 
-- SIMBL plugin to add "Clear All" button to Notification Center on OS X
-- Author: [w0lfschild](https://github.com/w0lfschild)
+- SIMBL plugin to add "Clear All" button to Notification Center on macOS
+- Orignial Author: [chuckhendo](https://github.com/chuckhendo)
+- Maintained by: [w0lfschild](https://github.com/w0lfschild)
 
 # Installation:
 

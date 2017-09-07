@@ -136,7 +136,8 @@ void _WB_NCTShow()
     for (NSString *app in [data valueForKey:@"applicationOrder"])
     {
         NSObject *appInfo = [data performSelector:@selector(applicationForIdentifier:) withObject:app];
-        [data performSelector:@selector(clearNotificationsForApplication:) withObject:appInfo];
+        if (appInfo != nil)
+            [data performSelector:@selector(clearNotificationsForApplication:) withObject:appInfo];
     }
 }
 
